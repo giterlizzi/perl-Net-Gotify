@@ -1,0 +1,16 @@
+Changes
+lib/Net/Gotify.pm
+lib/Net/Gotify/Application.pm
+lib/Net/Gotify/Client.pm
+lib/Net/Gotify/Error.pm
+lib/Net/Gotify/Message.pm
+lib/Net/Gotify/Plugin.pm
+lib/Net/Gotify/User.pm
+Makefile.PL
+MANIFEST
+README
+t/00-load.t
+t/kwalitee.t
+t/manifest.t
+t/pod-coverage.t
+t/pod.t
