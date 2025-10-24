@@ -6,9 +6,10 @@ lib/Net/Gotify/Error.pm
 lib/Net/Gotify/Message.pm
 lib/Net/Gotify/Plugin.pm
 lib/Net/Gotify/User.pm
+LICENSE
 Makefile.PL
-MANIFEST
-README
+MANIFEST			This list of files
+README.md
 t/00-load.t
 t/kwalitee.t
 t/manifest.t

@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use utf8;
 
+use Carp();
 use Moo;
 use HTTP::Tiny;
 use JSON::PP qw(encode_json decode_json);
@@ -136,9 +137,9 @@ sub create_message {
 
 sub delete_message {
 
-    my ($self, %params) = @_;
+    my ($self, $id) = @_;
 
-    my $id = delete $params{id} or Carp::croak 'Specify message "id"';
+    Carp::croak 'Specify message "id"' unless $id;
 
     $self->request(method => 'DELETE', path => sprintf('/message/%s', $id));
 
@@ -291,8 +292,8 @@ sub delete_application {
 
 }
 
-sub update_application_image { }
-sub delete_application_image { }
+sub update_application_image { Carp::carp 'Method not implemented' }
+sub delete_application_image { Carp::carp 'Method not implemented' }
 
 
 # Plugins
@@ -308,8 +309,8 @@ sub get_plugins {
 
 }
 
-sub get_plugin_config    { }
-sub update_plugin_config { }
+sub get_plugin_config    { Carp::carp 'Method not implemented' }
+sub update_plugin_config { Carp::carp 'Method not implemented' }
 
 sub enable_plugin {
 
@@ -333,7 +334,7 @@ sub disable_plugin {
 
 }
 
-sub get_plugin { }
+sub get_plugin { Carp::carp 'Method not implemented' }
 
 
 # Users
@@ -427,11 +428,15 @@ sub delete_user {
 
 1;
 
+__END__
+
+=pod
+
 =encoding utf-8
 
 =head1 NAME
 
-Net::Gotify - Gotify client for Perl 
+Net::Gotify - Gotify client for Perl
 
 =head1 SYNOPSIS
 
@@ -444,14 +449,26 @@ Net::Gotify - Gotify client for Perl
       logger       => $logger
   );
 
-  $gotify->create_message(
-      title    => 'Backup',
-      message  => '**Backup** was successfully finished.',
-      priority => 2,
-      extras   => {
-          'client::display' => {contentType   => 'text/markdown'}
-      }
-  );
+  my $msg = eval {
+    $gotify->create_message(
+        title    => 'Backup',
+        message  => '**Backup** was successfully finished.',
+        priority => 2,
+        extras   => {
+            'client::display' => {contentType => 'text/markdown'}
+        }
+    )
+  };
+
+  if ($@) {
+    say $@->description;
+  }
+
+  my @messages = $gotify->get_messages();
+
+  foreach my $msg (@messages) {
+    say sprintf "[#%d] %s\n%s", $msg->id, $msg->title, $msg->message;
+  }
 
 =head1 DESCRIPTION
 
@@ -460,104 +477,336 @@ L<Net::Gotify> allows you to interact with Gotify server via Perl.
 L<https://gotify.net/>
 
 
-=head2 OBJECT-ORIENTED INTERFACE
+=head2 Gotify API
+
+=head3 B<new>
+
+    $gotify = Net::Gotify->new( \%params );
+
+Create a new instance of L<Net::Gotify>.
+
+Parameters:
 
 =over
 
-=item $gotify = Net::Gotify->new(%params)
+=item * B<base_url>, Gotify base URL
 
-=item $gotify->request
+=item * B<app_token>, Application token
+
+=item * B<client_token>, Client token
+
+=item * B<verify_ssl>, Enable SSL/TLS certificate check
+
+=item * B<logger>, Logger instance (L<Log::Any>, L<Mojo::Log>, etc.)
 
 =back
 
+    my $gotify = Net::Gotify->new(
+        base_url     => 'http://localhost:8088',
+        app_token    => '<TOKEN>',
+        client_token => '<TOKEN>',
+        logger       => $logger
+    );
 
-=head3 Message API
+=head3 B<request>
+
+    $res = $gotify->request( \%params );
+
+Send a RAW HTTP request to Gotify.
+
+Parameters:
 
 =over
 
-=item $gotify->create_message
+=item * B<method>, Request method
 
-=item $gotify->delete_message
+=item * B<token_type>, Token type (default: C<client>)
 
-=item $gotify->delete_messages
+=item * B<path>, Request path
 
-=item $gotify->get_messages
+=item * B<data>, Request data (HASH)
+
+=item * B<options>, Request options (HASH)
 
 =back
 
+    $res = $gotify->request( method     => 'POST', path => '/message',
+                             token_type => 'app',  data => \%data );
 
-=head3 Client API
+
+=head2 Message API
+
+=head3 B<create_message>
+
+    $message = $gotify->create_message( message  => $message );
+
+    $message = $gotify->create_message( message  => $message,  title  => $title,
+                                        priority => $priority, extras => \%extras );
+
+Create a message and return the L<Net::Gotify::Message> object.
+
+Pameters:
 
 =over
 
-=item $gotify->get_clients
+=item * B<message>, Notify nessage (required)
 
-=item $gotify->create_client
+=item * B<title>, Message title
 
-=item $gotify->update_client
+=item * B<priority>, Message priority
 
-=item $gotify->delete_client
+=item * B<extras>, Message extras
 
 =back
 
+Simple notification:
 
-=head3 Application API
+    $gotify->create_message( message => 'Job completed!' );
+
+Notification with title and markdown:
+
+    $gotify->create_message(
+        title    => 'Backup',
+        message  => '**Backup** was successfully finished.',
+        priority => 2,
+        extras   => {
+            'client::display' => {contentType => 'text/markdown'}
+        }
+    );
+
+=head3 B<delete_message>
+
+    $gotify->delete_message ( $message_id );
+
+Delete a single message.
+
+=head3 B<delete_messages>
+
+    $gotify->delete_messages( \%params );
+
+    $gotify->delete_messages( app_id => $application_id );
+
+Delete all messages.
+
+Parameters:
 
 =over
 
-=item $gotify->get_applications
-
-=item $gotify->create_application
-
-=item $gotify->update_application
-
-=item $gotify->delete_application
-
-=item $gotify->update_application_image
-
-=item $gotify->delete_application_image
+=item * B<app_id>, Application ID
 
 =back
 
+=head3 B<get_messages>
 
-=head3 Plugin API
+    $array = $gotify->get_messages( \%params );
+
+    $array = $gotify->get_messages( app_id => $application_id, 
+                                    limit  => $limit,  since => $since );
+
+Fetch all messages and return an ARRAY of L<Net::Gotify::Message> objects.
+
+Parameters:
 
 =over
 
-=item $gotify->get_plugins
+=item * B<app_id>, Application ID
 
-=item $gotify->get_plugin_config
+=item * B<limit>, Result limit (default: C<100>), the maximal amount of messages to return
 
-=item $gotify->update_plugin_config
-
-=item $gotify->enable_plugin
-
-=item $gotify->disable_plugin
-
-=item $gotify->get_plugin
+=item * B<since>, return all messages with an ID less than this value
 
 =back
 
+    my @messages = $gotify->get_messages();
 
-=head3 User API
+    foreach my $msg (@messages) {
+        say sprintf "[#%d] %s\n%s", $msg->id, $msg->title, $msg->message;
+    }
+
+
+=head2 Client API
+
+=head3 B<get_clients>
+
+    $gotify->get_clients( );
+
+Fetch all clients and return an array of L<Net::Gotify::Client> objects.
+
+=head3 B<create_client>
+
+    $gotify->create_client( \%params );
+
+Create a client and return the L<Net::Gotify::Client> object.
+
+Parameters:
 
 =over
 
-=item $gotify->current_user
-
-=item $gotify->update_current_user_password
-
-=item $gotify->get_users
-
-=item $gotify->create_user
-
-=item $gotify->get_user
-
-=item $gotify->update_user
-
-=item $gotify->delete_user
+=item * B<name>, Client name (required)
 
 =back
+
+=head3 B<update_client>
+
+    $gotify->update_client( $client_id, \%params );
+
+Update a client and return the L<Net::Gotify::Client> object.
+
+Parameters:
+
+=over
+
+=item * B<name>, Client name (required)
+
+=back
+
+=head3 B<delete_client>
+
+    $gotify->delete_client( $client_id );
+
+Delete a client.
+
+=head2 Application API
+
+=head3 B<get_applications>
+
+    $gotify->get_applications( );
+
+Fetch all applications and return an array of L<Net::Gotify::Application> objects.
+
+=head3 B<create_application>
+
+    $gotify->create_application( \%params );
+
+Create an application and return the L<Net::Gotify::Application> object.
+
+Parameters:
+
+=over
+
+=item * B<name>, Application name (required).
+
+=item * B<description>, Application description.
+
+=item * B<default_priority>, Default application priority (default: 0).
+
+=back
+
+=head3 B<update_application>
+
+    $gotify->update_application( $app_id, \%params );
+
+Update an application and return the L<Net::Gotify::Application> object.
+
+=over
+
+=item * B<name>, Application name (required).
+
+=item * B<description>, Application description.
+
+=item * B<default_priority>, Default application priority (default: 0).
+
+=back
+
+=head3 B<delete_application>
+
+    $gotify->delete_application( $app_id );
+
+Delete an application.
+
+=head3 B<update_application_image>
+
+TODO - Method not implemented.
+
+=head3 B<delete_application_image>
+
+TODO - Method not implemented.
+
+=head2 Plugin API
+
+=head3 B<get_plugins>
+
+    $gotify->get_plugins( );
+
+Fetch all plugins and return an array of L<Net::Gotify::Plugin> objects.
+
+=head3 B<get_plugin_config>
+
+TODO - Method not implemented.
+
+=head3 B<update_plugin_config>
+
+TODO - Method not implemented.
+
+=head3 B<enable_plugin>
+
+    $gotify->enable_plugin( );
+
+Enable a plugin.
+
+=head3 B<disable_plugin>
+
+    $gotify->disable_plugin( );
+
+Disable a plugin.
+
+=head3 B<get_plugin>
+
+TODO - Method not implemented.
+
+
+=head2 User API
+
+=head3 B<current_user>
+
+    $gotify->current_user;
+
+Return the current user and return L<Net::Gotify::User> object.
+
+=head3 B<update_current_user_password>
+
+    $gotify->update_current_user_password( $password );
+
+Update the password of the current user.
+
+=head3 B<get_users>
+
+    $gotify->get_users ( \%params );
+
+Fetch all users and return an ARRAY of L<Net::Gotify::User> objects.
+
+=head3 B<create_user>
+
+    $gotify->create_user( name => $name, pass => $pass, admin => $flag );
+
+Create a user and return L<Net::Gotify::User> object.
+
+Parameters:
+
+=over
+
+=item * B<name>, User name
+
+=item * B<pass>, User password
+
+=item * B<admin>, Admin flag
+
+=back
+
+=head3 B<get_user>
+
+    $gotify->get_user( $user_id );
+
+Get a user and return L<Net::Gotify::User> object.
+
+=head3 B<update_user>
+
+
+=head3 B<delete_user>
+
+    $gotify->delete_user( $user_id );
+
+Delete a user.
 
 
 =head1 SUPPORT

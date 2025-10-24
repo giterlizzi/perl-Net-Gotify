@@ -19,7 +19,7 @@ $gotify->create_message(
     message  => '**Backup** was successfully finished.',
     priority => 2,
     extras   => {
-        'client::display' => {contentType   => 'text/markdown'}
+        'client::display' => {contentType => 'text/markdown'}
     }
 );
 ```
